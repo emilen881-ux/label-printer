@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Бирки USB</title>
+  <title>Бирки USB + PDF</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -62,6 +62,7 @@
     .btn-connect{background:#10b981;}
     .btn-disconnect{background:#f59e0b;}
     .btn-print{background:#ec4899;}
+    .btn-pdf{background:#6366f1;}
     .status{
       padding:10px;
       margin-bottom:12px;
@@ -79,11 +80,16 @@
       border-radius:6px;
       margin-bottom:12px;
     }
+    .section{
+      margin-top:16px;
+      padding-top:16px;
+      border-top:2px solid #e5e7eb;
+    }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🏷️ Печать бирок USB</h1>
+  <h1>🏷️ Печать бирок</h1>
   
   <div class="hint">
     ✅ Печатается как картинка. Что видишь — то и будет!
@@ -103,16 +109,22 @@
   <input id="i4" type="text" placeholder="Строка 4" value="от 1РП3">
   <input id="i5" type="text" placeholder="Строка 5" value="L=15м">
 
-  <div class="status" id="status">🔴 USB не подключен</div>
+  <div class="section">
+    <div class="status" id="status">🔴 USB не подключен</div>
+    <button class="btn btn-connect" id="connectBtn">🔌 Подключить принтер</button>
+    <button class="btn btn-disconnect" id="disconnectBtn" disabled>🔌 Отключить</button>
+    <button class="btn btn-print" id="printBtn" disabled>⚡ Печать через USB</button>
+  </div>
 
-  <button class="btn btn-connect" id="connectBtn">🔌 Подключить принтер</button>
-  <button class="btn btn-disconnect" id="disconnectBtn" disabled>🔌 Отключить</button>
-  <button class="btn btn-print" id="printBtn" disabled>⚡ Печать через USB</button>
+  <div class="section">
+    <button class="btn btn-pdf" id="pdfBtn">📄 Скачать PDF</button>
+  </div>
 </div>
 
 <canvas id="canvas"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 let device=null;
 let endpoint=1;
@@ -165,7 +177,6 @@ async function printUSB(){
   if(!device){alert('❌ Подключи принтер');return;}
   
   try{
-    // Рендерим превью в canvas
     const canvas=await html2canvas(document.getElementById('preview'),{
       scale:2,
       backgroundColor:'#ffffff'
@@ -179,26 +190,22 @@ async function printUSB(){
     const h=canvas.height;
     const bytesPerRow=Math.ceil(w/8);
     
-    // Конвертируем в монохромный bitmap (инвертируем: 0=черный, 1=белый)
     const bitmapBytes=[];
     for(let y=0;y<h;y++){
       let bits='';
       for(let x=0;x<w;x++){
         const i=(y*w+x)*4;
         const brightness=(pixels[i]+pixels[i+1]+pixels[i+2])/3;
-        bits+=brightness<128?'0':'1';  // ← ИЗМЕНЕНО: инвертировали
+        bits+=brightness<128?'0':'1';
       }
-      // Дополняем до кратности 8
-      while(bits.length%8!==0) bits+='1';  // ← белым фоном
+      while(bits.length%8!==0) bits+='1';
       
-      // Конвертируем в байты
       for(let i=0;i<bits.length;i+=8){
         const byte=parseInt(bits.substring(i,i+8),2);
         bitmapBytes.push(byte);
       }
     }
     
-    // Формируем TSPL команду
     let cmd='';
     cmd+='SIZE 40 mm,30 mm\r\n';
     cmd+='GAP 2 mm,0 mm\r\n';
@@ -206,16 +213,13 @@ async function printUSB(){
     cmd+='CLS\r\n';
     cmd+=`BITMAP 0,0,${bytesPerRow},${h},1,`;
     
-    // ASCII часть команды
     const cmdBytes=[];
     for(let i=0;i<cmd.length;i++){
       cmdBytes.push(cmd.charCodeAt(i));
     }
     
-    // Добавляем bitmap данные
     cmdBytes.push(...bitmapBytes);
     
-    // Завершение команды
     const footer='\r\nPRINT 1,1\r\n';
     for(let i=0;i<footer.length;i++){
       cmdBytes.push(footer.charCodeAt(i));
@@ -223,7 +227,6 @@ async function printUSB(){
     
     const data=new Uint8Array(cmdBytes);
     console.log('Отправляем байтов:',data.length);
-    console.log('Размер изображения:',w,'x',h,'пикселей');
     
     await device.transferOut(endpoint,data);
     alert('✅ Отправлено на принтер!');
@@ -234,10 +237,42 @@ async function printUSB(){
   }
 }
 
+// PDF экспорт (портретная ориентация 30×40мм)
+async function exportPDF(){
+  try{
+    const canvas=await html2canvas(document.getElementById('preview'),{
+      scale:3,
+      backgroundColor:'#ffffff'
+    });
+    
+    const {jsPDF}=window.jspdf;
+    
+    // ПОРТРЕТНАЯ ориентация: 30mm (ширина) × 40mm (высота)
+    const pdf=new jsPDF({
+      orientation:'portrait',
+      unit:'mm',
+      format:[30,40]
+    });
+    
+    // Поворачиваем изображение на 90° и вписываем в 30×40
+    const imgData=canvas.toDataURL('image/png');
+    
+    // Картинка 40×30, PDF 30×40 — нужно повернуть на 90°
+    pdf.addImage(imgData,'PNG',0,0,30,40,undefined,'FAST',90);
+    
+    pdf.save('birka.pdf');
+    alert('✅ PDF сохранён!');
+  }catch(e){
+    console.error(e);
+    alert('❌ Ошибка: '+e.message);
+  }
+}
+
 // События
 document.getElementById('connectBtn').addEventListener('click',connect);
 document.getElementById('disconnectBtn').addEventListener('click',disconnect);
 document.getElementById('printBtn').addEventListener('click',printUSB);
+document.getElementById('pdfBtn').addEventListener('click',exportPDF);
 </script>
 </body>
 </html>
