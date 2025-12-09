@@ -1387,27 +1387,27 @@ L=50м"></textarea>
             document.getElementById('v4').textContent = pt + 'мм';
         }
 
-        // ====== USB ПЕЧАТЬ TSPL С ПРАВИЛЬНОЙ КОДИРОВКОЙ ======
+        // ====== USB ПЕЧАТЬ TSPL С CP866 ======
         
-        // Конвертация UTF-8 в Windows-1251 (Cyrillic)
-        function utf8ToWin1251(str) {
-            const win1251Codes = {
-                'А':0xC0,'Б':0xC1,'В':0xC2,'Г':0xC3,'Д':0xC4,'Е':0xC5,'Ж':0xC6,'З':0xC7,
-                'И':0xC8,'Й':0xC9,'К':0xCA,'Л':0xCB,'М':0xCC,'Н':0xCD,'О':0xCE,'П':0xCF,
-                'Р':0xD0,'С':0xD1,'Т':0xD2,'У':0xD3,'Ф':0xD4,'Х':0xD5,'Ц':0xD6,'Ч':0xD7,
-                'Ш':0xD8,'Щ':0xD9,'Ъ':0xDA,'Ы':0xDB,'Ь':0xDC,'Э':0xDD,'Ю':0xDE,'Я':0xDF,
-                'а':0xE0,'б':0xE1,'в':0xE2,'г':0xE3,'д':0xE4,'е':0xE5,'ж':0xE6,'з':0xE7,
-                'и':0xE8,'й':0xE9,'к':0xEA,'л':0xEB,'м':0xEC,'н':0xED,'о':0xEE,'п':0xEF,
-                'р':0xF0,'с':0xF1,'т':0xF2,'у':0xF3,'ф':0xF4,'х':0xF5,'ц':0xF6,'ч':0xF7,
-                'ш':0xF8,'щ':0xF9,'ъ':0xFA,'ы':0xFB,'ь':0xFC,'э':0xFD,'ю':0xFE,'я':0xFF,
-                'Ё':0xA8,'ё':0xB8,'№':0xB9,'×':0xD7,'÷':0xF7
+        // Конвертация UTF-8 в CP866 (DOS Cyrillic)
+        function utf8ToCP866(str) {
+            const cp866Map = {
+                'А':0x80,'Б':0x81,'В':0x82,'Г':0x83,'Д':0x84,'Е':0x85,'Ж':0x86,'З':0x87,
+                'И':0x88,'Й':0x89,'К':0x8A,'Л':0x8B,'М':0x8C,'Н':0x8D,'О':0x8E,'П':0x8F,
+                'Р':0x90,'С':0x91,'Т':0x92,'У':0x93,'Ф':0x94,'Х':0x95,'Ц':0x96,'Ч':0x97,
+                'Ш':0x98,'Щ':0x99,'Ъ':0x9A,'Ы':0x9B,'Ь':0x9C,'Э':0x9D,'Ю':0x9E,'Я':0x9F,
+                'а':0xA0,'б':0xA1,'в':0xA2,'г':0xA3,'д':0xA4,'е':0xA5,'ж':0xA6,'з':0xA7,
+                'и':0xA8,'й':0xA9,'к':0xAA,'л':0xAB,'м':0xAC,'н':0xAD,'о':0xAE,'п':0xAF,
+                'р':0xE0,'с':0xE1,'т':0xE2,'у':0xE3,'ф':0xE4,'х':0xE5,'ц':0xE6,'ч':0xE7,
+                'ш':0xE8,'щ':0xE9,'ъ':0xEA,'ы':0xEB,'ь':0xEC,'э':0xED,'ю':0xEE,'я':0xEF,
+                'Ё':0xF0,'ё':0xF1
             };
             
             const bytes = [];
             for (let i = 0; i < str.length; i++) {
                 const char = str.charAt(i);
-                if (win1251Codes[char]) {
-                    bytes.push(win1251Codes[char]);
+                if (cp866Map[char]) {
+                    bytes.push(cp866Map[char]);
                 } else {
                     bytes.push(str.charCodeAt(i));
                 }
@@ -1479,23 +1479,23 @@ L=50м"></textarea>
         }
         
         function generateTSPL(label) {
-            // Настройка принтера
-            let cmd = 'SIZE 40 mm, 30 mm\r\n';
+            let cmd = '';
+            
+            cmd += 'SIZE 40 mm, 30 mm\r\n';
             cmd += 'GAP 2 mm, 0 mm\r\n';
             cmd += 'DIRECTION 0\r\n';
             cmd += 'REFERENCE 0,0\r\n';
-            cmd += 'CODEPAGE 1251\r\n';  // Windows-1251 для русского
+            cmd += 'COUNTRY 007\r\n';
+            cmd += 'CODEPAGE 866\r\n';
             cmd += 'CLS\r\n';
             
             let y = 20;
             
-            // Первая строка (жирная, крупная)
             if (label.line1) {
                 cmd += `TEXT 20,${y},"4",0,2,2,"${label.line1}"\r\n`;
                 y += 45;
             }
             
-            // Остальные строки
             if (label.line2) {
                 cmd += `TEXT 20,${y},"3",0,1,1,"${label.line2}"\r\n`;
                 y += 30;
@@ -1537,12 +1537,12 @@ L=50м"></textarea>
                 const printerCmd = generateTSPL(label);
                 console.log('TSPL команда:', printerCmd);
                 
-                const data = utf8ToWin1251(printerCmd);
-                console.log('Байты (Win-1251):', data);
+                const data = utf8ToCP866(printerCmd);
+                console.log('Байты (CP866):', data);
                 
                 await usbDevice.transferOut(usbEndpoint, data);
                 
-                toast('⚡ Отправлено на принтер (TSPL)!', 'success');
+                toast('⚡ Отправлено на принтер (TSPL/CP866)!', 'success');
                 
             } catch (error) {
                 console.error('Ошибка печати:', error);
@@ -1570,7 +1570,7 @@ L=50м"></textarea>
                     allCommands += generateTSPL(label);
                 });
                 
-                const data = utf8ToWin1251(allCommands);
+                const data = utf8ToCP866(allCommands);
                 await usbDevice.transferOut(usbEndpoint, data);
                 
                 toast(`⚡ Напечатано ${selectedIndices.size} бирок!`, 'success');
