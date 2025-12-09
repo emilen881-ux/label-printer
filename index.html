@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Эмиль Бирки — чистый TSPL</title>
+  <title>Эмиль Бирки — настроенный TSPL</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     body{
@@ -43,6 +43,25 @@
       font-size:14px;
       box-sizing:border-box;
     }
+    .slider-group{
+      margin-bottom:12px;
+      padding:12px;
+      background:white;
+      border-radius:8px;
+    }
+    .slider-group label{
+      display:flex;
+      justify-content:space-between;
+      font-size:13px;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .slider{
+      width:100%;
+      height:6px;
+      border-radius:3px;
+      outline:none;
+    }
     .btn{
       width:100%;
       padding:10px 14px;
@@ -56,6 +75,7 @@
     }
     .btn-primary{background:#6366f1;}
     .btn-usb{background:#ec4899;}
+    .btn-disconnect{background:#f59e0b;}
     .btn-danger{background:#ef4444;}
     .btn:disabled{opacity:.5;cursor:not-allowed;}
     .row{display:flex;gap:6px;margin-bottom:6px;}
@@ -63,6 +83,17 @@
     .status{
       font-size:13px;
       margin-bottom:8px;
+      padding:8px;
+      background:white;
+      border-radius:8px;
+    }
+    .hint{
+      font-size:12px;
+      color:#6b7280;
+      margin-bottom:8px;
+      padding:8px;
+      background:#fef3c7;
+      border-radius:8px;
     }
     #printArea{display:none;}
     @media print{
@@ -87,37 +118,77 @@
 </head>
 <body>
 <div class="app">
-  <h1>Эмиль Бирки — TSPL</h1>
+  <h1>🏷️ Эмиль Бирки — TSPL</h1>
+
+  <div class="hint">
+    💡 Пока только латиница/цифры. Подстрой разметку слайдерами, потом добавим русский.
+  </div>
 
   <div class="preview-wrap">
     <div class="label" id="preview">
-      <div class="l1"></div>
-      <div class="l2"></div>
-      <div class="l3"></div>
-      <div class="l4"></div>
-      <div class="l5"></div>
+      <div class="l1" style="font-size:12pt;font-weight:bold"></div>
+      <div class="l2" style="font-size:10pt"></div>
+      <div class="l3" style="font-size:10pt"></div>
+      <div class="l4" style="font-size:10pt"></div>
+      <div class="l5" style="font-size:10pt"></div>
     </div>
   </div>
 
   <div class="controls">
-    <input id="l1" type="text" placeholder="Line 1 (Latin only)">
-    <input id="l2" type="text" placeholder="Line 2">
-    <input id="l3" type="text" placeholder="Line 3">
-    <input id="l4" type="text" placeholder="Line 4">
-    <input id="l5" type="text" placeholder="Line 5">
+    <input id="l1" type="text" placeholder="Line 1 (Latin only)" value="SHR-P-1">
+    <input id="l2" type="text" placeholder="Line 2" value="Osveshchenie">
+    <input id="l3" type="text" placeholder="Line 3" value="VVGng-LSLT 3x1.5">
+    <input id="l4" type="text" placeholder="Line 4" value="ot SHR-P">
+    <input id="l5" type="text" placeholder="Line 5" value="L=15m">
   </div>
 
-  <div class="status" id="usbStatus">USB: not connected</div>
+  <div class="slider-group">
+    <label>
+      <span>📍 Y начало (отступ сверху)</span>
+      <span id="yStartVal">10</span>
+    </label>
+    <input type="range" class="slider" id="yStart" min="0" max="50" value="10" step="1">
+  </div>
 
-  <button class="btn btn-usb" id="usbConnectBtn">Connect USB printer</button>
-  <button class="btn btn-usb" id="usbPrintBtn" disabled>Print via USB (TSPL text)</button>
+  <div class="slider-group">
+    <label>
+      <span>↕️ Интервал между строками</span>
+      <span id="yStepVal">25</span>
+    </label>
+    <input type="range" class="slider" id="yStep" min="15" max="40" value="25" step="1">
+  </div>
+
+  <div class="slider-group">
+    <label>
+      <span>↔️ X отступ слева</span>
+      <span id="xLeftVal">10</span>
+    </label>
+    <input type="range" class="slider" id="xLeft" min="0" max="50" value="10" step="1">
+  </div>
+
+  <div class="slider-group">
+    <label>
+      <span>🔄 Поворот (DIRECTION)</span>
+      <span id="dirVal">1</span>
+    </label>
+    <input type="range" class="slider" id="direction" min="0" max="3" value="1" step="1">
+  </div>
+
+  <div class="status" id="usbStatus">🔴 USB: не подключен</div>
 
   <div class="row">
-    <button class="btn btn-primary" id="pdfBtn">PDF 40×30</button>
-    <button class="btn btn-primary" id="pngBtn">PNG</button>
+    <button class="btn btn-usb" id="usbConnectBtn">🔌 Подключить</button>
+    <button class="btn btn-disconnect" id="usbDisconnectBtn" disabled>🔌 Отключить</button>
+  </div>
+  
+  <button class="btn btn-usb" id="usbPrintBtn" disabled>⚡ Печать через USB (TSPL)</button>
+
+  <div class="row">
+    <button class="btn btn-primary" id="pdfBtn">📄 PDF</button>
+    <button class="btn btn-primary" id="pngBtn">🖼️ PNG</button>
   </div>
 
-  <button class="btn btn-danger" id="printBtn">Browser print</button>
+  <button class="btn btn-danger" id="printBtn">🖨️ Обычная печать</button>
 
   <div id="printArea"></div>
 </div>
@@ -135,13 +206,26 @@ function updatePreview(){
     lines[i-1].textContent=document.getElementById('l'+i).value;
   }
 }
+
+function updateSliderValues(){
+  document.getElementById('yStartVal').textContent=document.getElementById('yStart').value;
+  document.getElementById('yStepVal').textContent=document.getElementById('yStep').value;
+  document.getElementById('xLeftVal').textContent=document.getElementById('xLeft').value;
+  document.getElementById('dirVal').textContent=document.getElementById('direction').value;
+}
+
 ['l1','l2','l3','l4','l5'].forEach(id=>{
   document.getElementById(id).addEventListener('input',updatePreview);
 });
-updatePreview();
 
-// --- TSPL текстовая команда ---
-// ВАЖНО: пока только латиница/цифры, без русских
+['yStart','yStep','xLeft','direction'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',updateSliderValues);
+});
+
+updatePreview();
+updateSliderValues();
+
+// --- TSPL команда с настройками ---
 function buildTSPL(){
   const l1=document.getElementById('l1').value;
   const l2=document.getElementById('l2').value;
@@ -149,32 +233,37 @@ function buildTSPL(){
   const l4=document.getElementById('l4').value;
   const l5=document.getElementById('l5').value;
 
-  let y=20;          // координаты в точках
-  const xLeft=20;    // слева небольшой отступ
+  const yStart=parseInt(document.getElementById('yStart').value);
+  const yStep=parseInt(document.getElementById('yStep').value);
+  const xLeft=parseInt(document.getElementById('xLeft').value);
+  const dir=parseInt(document.getElementById('direction').value);
+
+  let y=yStart;
 
   let cmd='';
   cmd+='SIZE 40 mm,30 mm\r\n';
   cmd+='GAP 2 mm,0 mm\r\n';
-  cmd+='DIRECTION 1\r\n';     // повернуть, если этикетка идёт поперёк
+  cmd+=`DIRECTION ${dir}\r\n`;
   cmd+='REFERENCE 0,0\r\n';
   cmd+='CLS\r\n';
 
+  // Первая строка крупнее (шрифт "4")
   if(l1){
-    // крупнее для первой строки
     cmd+=`TEXT ${xLeft},${y},"4",0,1,1,"${l1}"\r\n`;
-    y+=40;
+    y+=yStep+10; // для крупного шрифта больше отступ
   }
+  // Остальные строки мельче (шрифт "3")
   if(l2){
     cmd+=`TEXT ${xLeft},${y},"3",0,1,1,"${l2}"\r\n`;
-    y+=28;
+    y+=yStep;
   }
   if(l3){
     cmd+=`TEXT ${xLeft},${y},"3",0,1,1,"${l3}"\r\n`;
-    y+=28;
+    y+=yStep;
   }
   if(l4){
     cmd+=`TEXT ${xLeft},${y},"3",0,1,1,"${l4}"\r\n`;
-    y+=28;
+    y+=yStep;
   }
   if(l5){
     cmd+=`TEXT ${xLeft},${y},"3",0,1,1,"${l5}"\r\n`;
@@ -187,12 +276,16 @@ function buildTSPL(){
 // --- USB connect ---
 async function connectUSB(){
   if(!navigator.usb){
-    alert('WebUSB only in Chrome/Edge');
+    alert('❌ WebUSB работает только в Chrome/Edge');
     return;
   }
   try{
     usbDevice=await navigator.usb.requestDevice({
-      filters:[{classCode:7}]
+      filters:[
+        {vendorId:0x0416},
+        {vendorId:0x1FC9},
+        {classCode:7}
+      ]
     });
     await usbDevice.open();
     if(usbDevice.configuration===null){
@@ -202,27 +295,53 @@ async function connectUSB(){
     await usbDevice.claimInterface(iface.interfaceNumber);
     const outEp=iface.alternate.endpoints.find(e=>e.direction==='out');
     if(outEp) usbEndpoint=outEp.endpointNumber;
-    document.getElementById('usbStatus').textContent='USB: connected '+(usbDevice.productName||'');
+    
+    document.getElementById('usbStatus').textContent='🟢 USB: подключен '+(usbDevice.productName||'');
     document.getElementById('usbPrintBtn').disabled=false;
+    document.getElementById('usbConnectBtn').disabled=true;
+    document.getElementById('usbDisconnectBtn').disabled=false;
   }catch(e){
     console.error(e);
-    alert('USB error: '+e.message);
+    alert('❌ Ошибка USB: '+e.message);
+  }
+}
+
+// --- USB disconnect ---
+async function disconnectUSB(){
+  if(!usbDevice) return;
+  try{
+    await usbDevice.close();
+    usbDevice=null;
+    
+    document.getElementById('usbStatus').textContent='🔴 USB: не подключен';
+    document.getElementById('usbPrintBtn').disabled=true;
+    document.getElementById('usbConnectBtn').disabled=false;
+    document.getElementById('usbDisconnectBtn').disabled=true;
+  }catch(e){
+    console.error(e);
+    alert('❌ Ошибка отключения: '+e.message);
   }
 }
 
 async function printUSB(){
-  if(!usbDevice) return;
+  if(!usbDevice){
+    alert('❌ Сначала подключи принтер');
+    return;
+  }
   const cmd=buildTSPL();
-  // строго ASCII, без UTF‑8
+  console.log('TSPL команда:\n'+cmd);
+  
+  // Строго ASCII
   const bytes=new Uint8Array(cmd.length);
   for(let i=0;i<cmd.length;i++){
     bytes[i]=cmd.charCodeAt(i)&0xFF;
   }
   try{
     await usbDevice.transferOut(usbEndpoint,bytes);
+    alert('✅ Отправлено на принтер!');
   }catch(e){
     console.error(e);
-    alert('Print error: '+e.message);
+    alert('❌ Ошибка печати: '+e.message);
   }
 }
 
@@ -279,6 +398,7 @@ function browserPrint(){
 
 // events
 document.getElementById('usbConnectBtn').addEventListener('click',connectUSB);
+document.getElementById('usbDisconnectBtn').addEventListener('click',disconnectUSB);
 document.getElementById('usbPrintBtn').addEventListener('click',printUSB);
 document.getElementById('pdfBtn').addEventListener('click',exportPDF);
 document.getElementById('pngBtn').addEventListener('click',exportPNG);
