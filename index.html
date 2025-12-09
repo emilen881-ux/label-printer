@@ -75,7 +75,7 @@
       font-size:12px;
       color:#666;
       padding:10px;
-      background:#fef3c7;
+      background:#dcfce7;
       border-radius:6px;
       margin-bottom:12px;
     }
@@ -86,7 +86,7 @@
   <h1>🏷️ Печать бирок USB</h1>
   
   <div class="hint">
-    Печатается как картинка. Что видишь в превью — то и будет на бирке.
+    ✅ Печатается как картинка. Что видишь — то и будет!
   </div>
 
   <div class="preview" id="preview">
@@ -137,7 +137,7 @@ async function connect(){
     const ep=device.configuration.interfaces[0].alternate.endpoints.find(e=>e.direction==='out');
     if(ep) endpoint=ep.endpointNumber;
     
-    document.getElementById('status').textContent='🟢 '+( device.productName||'Подключен');
+    document.getElementById('status').textContent='🟢 '+(device.productName||'Подключен');
     document.getElementById('connectBtn').disabled=true;
     document.getElementById('disconnectBtn').disabled=false;
     document.getElementById('printBtn').disabled=false;
@@ -179,17 +179,17 @@ async function printUSB(){
     const h=canvas.height;
     const bytesPerRow=Math.ceil(w/8);
     
-    // Конвертируем в монохромный bitmap
+    // Конвертируем в монохромный bitmap (инвертируем: 0=черный, 1=белый)
     const bitmapBytes=[];
     for(let y=0;y<h;y++){
       let bits='';
       for(let x=0;x<w;x++){
         const i=(y*w+x)*4;
         const brightness=(pixels[i]+pixels[i+1]+pixels[i+2])/3;
-        bits+=brightness<128?'1':'0';
+        bits+=brightness<128?'0':'1';  // ← ИЗМЕНЕНО: инвертировали
       }
       // Дополняем до кратности 8
-      while(bits.length%8!==0) bits+='0';
+      while(bits.length%8!==0) bits+='1';  // ← белым фоном
       
       // Конвертируем в байты
       for(let i=0;i<bits.length;i+=8){
@@ -223,6 +223,7 @@ async function printUSB(){
     
     const data=new Uint8Array(cmdBytes);
     console.log('Отправляем байтов:',data.length);
+    console.log('Размер изображения:',w,'x',h,'пикселей');
     
     await device.transferOut(endpoint,data);
     alert('✅ Отправлено на принтер!');
