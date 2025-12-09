@@ -274,13 +274,67 @@
             background: linear-gradient(to right, rgba(102,126,234,0.1), rgba(255,255,255,0.95));
         }
         
+        .card-left {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+        
         .card-checkbox {
             width: 24px;
             height: 24px;
             min-width: 24px;
             cursor: pointer;
-            margin-top: 2px;
             accent-color: #667eea;
+        }
+        
+        .quantity-control {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .quantity-btn {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #667eea;
+            background: white;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #667eea;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        
+        .quantity-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .quantity-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .quantity-display {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
         }
         
         .card-content {
@@ -353,6 +407,9 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
             position: relative;
             overflow: hidden;
+            text-decoration: none;
+            display: block;
+            text-align: center;
         }
         
         .btn::before {
@@ -915,7 +972,7 @@
                 <input type="text" id="l1" placeholder="Группа">
                 <input type="text" id="l2" placeholder="Описание">
                 <input type="text" id="l3" placeholder="Кабель">
-                <input type="text" id="l4" placeholder="От какого щита">
+                <input type="text" id="l4" placeholder="От щита">
                 <input type="text" id="l5" placeholder="Длина">
             </div>
         </div>
@@ -1013,7 +1070,7 @@
         <div class="section">
             <div class="section-title">🔧 Исправления</div>
             <div class="hint" style="margin-bottom: 12px;">
-                Убрать цифровые суффиксы из поля "От какого щита"<br>
+                Убрать цифровые суффиксы из поля "От щита"<br>
                 Например: "от ЩР-П-1" → "от ЩР-П"
             </div>
             <button class="btn warning" id="fixBtn">🔧 Исправить все бирки</button>
@@ -1035,15 +1092,14 @@
         </div>
 
         <div class="section">
-            <div class="section-title">☁️ Облачное хранилище</div>
+            <div class="section-title">☁️ База данных на Яндекс.Диске</div>
             
             <div class="cloud-status">
                 <span class="icon">☁️</span>
-                <span id="cloudStatus">Не загружено</span>
+                <span>Скачай файл JSON с Яндекс.Диска, затем загрузи его через кнопку выше</span>
             </div>
 
-            <input type="text" id="cloudUrl" placeholder="Ссылка на Яндекс.Диск или Google Drive" value="https://disk.yandex.ru/d/AZzpGJ765_EA_w">
-            <button class="btn cloud" id="loadCloudBtn">📥 Загрузить из облака</button>
+            <a href="https://disk.yandex.ru/d/AZzpGJ765_EA_w" target="_blank" class="btn cloud">📥 Открыть Яндекс.Диск</a>
         </div>
 
         <div class="section">
@@ -1070,7 +1126,10 @@ L=50м"></textarea>
         <div class="selection-info">
             <span>🏷️</span>
             <span id="selectionCount">0</span>
-            <span>выбрано</span>
+            <span>шт</span>
+            <span>•</span>
+            <span id="totalQuantity">0</span>
+            <span>печати</span>
         </div>
         <div class="selection-actions">
             <button class="btn-usb" id="batchUsbBtn">⚡</button>
@@ -1088,14 +1147,12 @@ L=50м"></textarea>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script>
-        const DEFAULT_CLOUD_URL = 'https://disk.yandex.ru/d/AZzpGJ765_EA_w';
-        
         let labels = [];
         let filtered = [];
         let idx = -1;
         let w1 = 'bold';
         let w2 = 'normal';
-        let selectedIndices = new Set();
+        let selectedIndices = new Map(); // index -> quantity
         let usbDevice = null;
         let usbEndpoint = null;
         
@@ -1154,61 +1211,6 @@ L=50м"></textarea>
             }
         }
 
-        async function loadFromCloud() {
-            const url = document.getElementById('cloudUrl').value || DEFAULT_CLOUD_URL;
-            if (!url) {
-                toast('⚠️ Введи ссылку', 'error');
-                return;
-            }
-            
-            try {
-                document.getElementById('cloudStatus').textContent = 'Загрузка...';
-                
-                let downloadUrl = '';
-                
-                if (url.includes('disk.yandex') || url.includes('yadi.sk')) {
-                    downloadUrl = `https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=${encodeURIComponent(url)}`;
-                    
-                    const apiResponse = await fetch(downloadUrl);
-                    const apiData = await apiResponse.json();
-                    
-                    if (apiData.href) {
-                        downloadUrl = apiData.href;
-                    } else {
-                        throw new Error('Не удалось получить ссылку на скачивание');
-                    }
-                }
-                else if (url.includes('drive.google.com')) {
-                    let fileId = url.match(/\/d\/([^\/]+)/)?.[1];
-                    if (!fileId) fileId = url.match(/id=([^&]+)/)?.[1];
-                    if (!fileId) throw new Error('Неверная ссылка Google Drive');
-                    
-                    downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                }
-                else {
-                    throw new Error('Поддерживаются только Яндекс.Диск и Google Drive');
-                }
-                
-                const response = await fetch(downloadUrl);
-                const data = await response.json();
-                
-                if (Array.isArray(data)) {
-                    labels = data;
-                    saveToStorage();
-                    updateStats();
-                    applySearch();
-                    document.getElementById('cloudStatus').textContent = `✅ Загружено ${labels.length} бирок`;
-                    toast('☁️ База загружена!', 'success');
-                } else {
-                    throw new Error('Неверный формат файла');
-                }
-            } catch(e) {
-                console.error('Ошибка загрузки:', e);
-                document.getElementById('cloudStatus').textContent = '💡 Используй локальную загрузку';
-                toast('💡 Используй локальную загрузку', 'success');
-            }
-        }
-
         function loadFromFile() {
             document.getElementById('fileInput').click();
         }
@@ -1264,53 +1266,104 @@ L=50м"></textarea>
         function updateSelectionBar() {
             const bar = document.getElementById('selectionBar');
             const count = document.getElementById('selectionCount');
+            const total = document.getElementById('totalQuantity');
+            
+            const totalQty = Array.from(selectedIndices.values()).reduce((sum, qty) => sum + qty, 0);
             
             if (selectedIndices.size > 0) {
                 bar.classList.add('visible');
                 count.textContent = selectedIndices.size;
+                total.textContent = totalQty;
             } else {
                 bar.classList.remove('visible');
             }
         }
 
-        function toggleSelection(index, checkbox) {
-            if (checkbox.checked) {
-                selectedIndices.add(index);
+        function setQuantity(index, quantity) {
+            if (quantity > 0) {
+                selectedIndices.set(index, quantity);
             } else {
                 selectedIndices.delete(index);
             }
             updateSelectionBar();
+            render();
         }
 
         function clearSelection() {
             selectedIndices.clear();
-            document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = false);
             updateSelectionBar();
+            render();
         }
         
         function render() {
             const g = document.getElementById('grid');
             g.innerHTML = '';
             if (!filtered.length) {
-                g.innerHTML = '<div class="empty"><div class="empty-icon">🏷️</div><div>Нет бирок</div><small>Загрузи из облака или файла</small></div>';
+                g.innerHTML = '<div class="empty"><div class="empty-icon">🏷️</div><div>Нет бирок</div><small>Загрузи файл JSON</small></div>';
                 return;
             }
             filtered.forEach((l,i) => {
+                const isSelected = selectedIndices.has(i);
+                const quantity = selectedIndices.get(i) || 1;
+                
                 const c = document.createElement('div');
-                c.className = 'card' + (i===idx?' selected':'');
+                c.className = 'card' + (i===idx?' selected':'') + (isSelected?' selected':'');
+                
+                const leftDiv = document.createElement('div');
+                leftDiv.className = 'card-left';
                 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.className = 'card-checkbox';
-                checkbox.checked = selectedIndices.has(i);
+                checkbox.checked = isSelected;
                 checkbox.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    toggleSelection(i, checkbox);
+                    if (checkbox.checked) {
+                        selectedIndices.set(i, 1);
+                    } else {
+                        selectedIndices.delete(i);
+                    }
+                    updateSelectionBar();
+                    render();
                 });
+                
+                const qtyControl = document.createElement('div');
+                qtyControl.className = 'quantity-control';
+                
+                if (isSelected) {
+                    const btnUp = document.createElement('button');
+                    btnUp.className = 'quantity-btn';
+                    btnUp.textContent = '▲';
+                    btnUp.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        setQuantity(i, quantity + 1);
+                    });
+                    
+                    const display = document.createElement('div');
+                    display.className = 'quantity-display';
+                    display.textContent = quantity;
+                    
+                    const btnDown = document.createElement('button');
+                    btnDown.className = 'quantity-btn';
+                    btnDown.textContent = '▼';
+                    btnDown.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (quantity > 1) {
+                            setQuantity(i, quantity - 1);
+                        }
+                    });
+                    
+                    qtyControl.appendChild(btnUp);
+                    qtyControl.appendChild(display);
+                    qtyControl.appendChild(btnDown);
+                }
+                
+                leftDiv.appendChild(checkbox);
+                leftDiv.appendChild(qtyControl);
                 
                 const content = document.createElement('div');
                 content.className = 'card-content';
-                content.innerHTML = `<div class="card-title">${l.line1||l.id||''}</div><div class="card-text">${l.line2||l.label||''}</div><div class="card-text">${l.line3||l.reference||''}</div>`;
+                content.innerHTML = `<div class="card-title">${l.line1||l.id||''}</div><div class="card-text">${l.line2||l.label||''}</div><div class="card-text">${l.line3||l.reference||''}</div><div class="card-text">${l.line4||''}</div>`;
                 content.addEventListener('click', () => {
                     idx = i;
                     render();
@@ -1318,7 +1371,7 @@ L=50м"></textarea>
                     showTab(1);
                 });
                 
-                c.appendChild(checkbox);
+                c.appendChild(leftDiv);
                 c.appendChild(content);
                 g.appendChild(c);
             });
@@ -1516,88 +1569,93 @@ L=50м"></textarea>
             }
             
             try {
-                const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                const sortedEntries = Array.from(selectedIndices.entries()).sort((a, b) => a[0] - b[0]);
+                let totalPrinted = 0;
                 
-                for (const i of sortedIndices) {
+                for (const [i, quantity] of sortedEntries) {
                     const label = filtered[i];
-                    const tempDiv = document.createElement('div');
-                    tempDiv.style.position = 'absolute';
-                    tempDiv.style.left = '-9999px';
                     
-                    const pt = parseFloat(document.getElementById('s4').value);
-                    const lh = parseFloat(document.getElementById('s3').value);
-                    const f1 = parseFloat(document.getElementById('s1').value);
-                    const f2 = parseFloat(document.getElementById('s2').value);
-                    
-                    tempDiv.innerHTML = `
-                        <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
-                            <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
-                        </div>
-                    `;
-                    document.body.appendChild(tempDiv);
-                    
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                    
-                    const canvas = await html2canvas(tempDiv.firstElementChild, {
-                        scale: 2,
-                        backgroundColor: '#ffffff'
-                    });
-                    
-                    const ctx = canvas.getContext('2d');
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const pixels = imgData.data;
-                    
-                    const w = canvas.width;
-                    const h = canvas.height;
-                    const bytesPerRow = Math.ceil(w / 8);
-                    
-                    const bitmapBytes = [];
-                    for (let y = 0; y < h; y++) {
-                        let bits = '';
-                        for (let x = 0; x < w; x++) {
-                            const idx = (y * w + x) * 4;
-                            const brightness = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
-                            bits += brightness < 128 ? '0' : '1';
-                        }
-                        while (bits.length % 8 !== 0) bits += '1';
+                    for (let q = 0; q < quantity; q++) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.style.position = 'absolute';
+                        tempDiv.style.left = '-9999px';
                         
-                        for (let j = 0; j < bits.length; j += 8) {
-                            const byte = parseInt(bits.substring(j, j + 8), 2);
-                            bitmapBytes.push(byte);
+                        const pt = parseFloat(document.getElementById('s4').value);
+                        const lh = parseFloat(document.getElementById('s3').value);
+                        const f1 = parseFloat(document.getElementById('s1').value);
+                        const f2 = parseFloat(document.getElementById('s2').value);
+                        
+                        tempDiv.innerHTML = `
+                            <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
+                                <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
+                            </div>
+                        `;
+                        document.body.appendChild(tempDiv);
+                        
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        
+                        const canvas = await html2canvas(tempDiv.firstElementChild, {
+                            scale: 2,
+                            backgroundColor: '#ffffff'
+                        });
+                        
+                        const ctx = canvas.getContext('2d');
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const pixels = imgData.data;
+                        
+                        const w = canvas.width;
+                        const h = canvas.height;
+                        const bytesPerRow = Math.ceil(w / 8);
+                        
+                        const bitmapBytes = [];
+                        for (let y = 0; y < h; y++) {
+                            let bits = '';
+                            for (let x = 0; x < w; x++) {
+                                const idx = (y * w + x) * 4;
+                                const brightness = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+                                bits += brightness < 128 ? '0' : '1';
+                            }
+                            while (bits.length % 8 !== 0) bits += '1';
+                            
+                            for (let j = 0; j < bits.length; j += 8) {
+                                const byte = parseInt(bits.substring(j, j + 8), 2);
+                                bitmapBytes.push(byte);
+                            }
                         }
+                        
+                        let cmd = '';
+                        cmd += 'SIZE 40 mm,30 mm\r\n';
+                        cmd += 'GAP 2 mm,0 mm\r\n';
+                        cmd += 'DIRECTION 1\r\n';
+                        cmd += 'CLS\r\n';
+                        cmd += `BITMAP 0,0,${bytesPerRow},${h},1,`;
+                        
+                        const cmdBytes = [];
+                        for (let j = 0; j < cmd.length; j++) {
+                            cmdBytes.push(cmd.charCodeAt(j));
+                        }
+                        
+                        cmdBytes.push(...bitmapBytes);
+                        
+                        const footer = '\r\nPRINT 1,1\r\n';
+                        for (let j = 0; j < footer.length; j++) {
+                            cmdBytes.push(footer.charCodeAt(j));
+                        }
+                        
+                        const data = new Uint8Array(cmdBytes);
+                        await usbDevice.transferOut(usbEndpoint, data);
+                        
+                        document.body.removeChild(tempDiv);
+                        totalPrinted++;
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
-                    
-                    let cmd = '';
-                    cmd += 'SIZE 40 mm,30 mm\r\n';
-                    cmd += 'GAP 2 mm,0 mm\r\n';
-                    cmd += 'DIRECTION 1\r\n';
-                    cmd += 'CLS\r\n';
-                    cmd += `BITMAP 0,0,${bytesPerRow},${h},1,`;
-                    
-                    const cmdBytes = [];
-                    for (let j = 0; j < cmd.length; j++) {
-                        cmdBytes.push(cmd.charCodeAt(j));
-                    }
-                    
-                    cmdBytes.push(...bitmapBytes);
-                    
-                    const footer = '\r\nPRINT 1,1\r\n';
-                    for (let j = 0; j < footer.length; j++) {
-                        cmdBytes.push(footer.charCodeAt(j));
-                    }
-                    
-                    const data = new Uint8Array(cmdBytes);
-                    await usbDevice.transferOut(usbEndpoint, data);
-                    
-                    document.body.removeChild(tempDiv);
-                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
                 
-                toast(`⚡ Напечатано ${selectedIndices.size} бирок!`, 'success');
+                toast(`⚡ Напечатано ${totalPrinted} бирок!`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка печати:', error);
@@ -1637,48 +1695,52 @@ L=50м"></textarea>
             }
 
             try {
-                const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                const sortedEntries = Array.from(selectedIndices.entries()).sort((a, b) => a[0] - b[0]);
                 
-                for (const i of sortedIndices) {
+                for (const [i, quantity] of sortedEntries) {
                     const label = filtered[i];
-                    const tempDiv = document.createElement('div');
-                    tempDiv.style.position = 'absolute';
-                    tempDiv.style.left = '-9999px';
                     
-                    const pt = parseFloat(document.getElementById('s4').value);
-                    const lh = parseFloat(document.getElementById('s3').value);
-                    const f1 = parseFloat(document.getElementById('s1').value);
-                    const f2 = parseFloat(document.getElementById('s2').value);
-                    
-                    tempDiv.innerHTML = `
-                        <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
-                            <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
-                        </div>
-                    `;
-                    document.body.appendChild(tempDiv);
-                    
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    const canvas = await html2canvas(tempDiv.firstElementChild, {
-                        scale: 4,
-                        backgroundColor: '#ffffff'
-                    });
-                    
-                    const a = document.createElement('a');
-                    const filename = (label.line1 || 'birka').replace(/[^a-zA-Z0-9]/g, '_');
-                    a.href = canvas.toDataURL('image/png');
-                    a.download = `emil_${filename}.png`;
-                    a.click();
-                    
-                    document.body.removeChild(tempDiv);
-                    await new Promise(resolve => setTimeout(resolve, 200));
+                    for (let q = 0; q < quantity; q++) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.style.position = 'absolute';
+                        tempDiv.style.left = '-9999px';
+                        
+                        const pt = parseFloat(document.getElementById('s4').value);
+                        const lh = parseFloat(document.getElementById('s3').value);
+                        const f1 = parseFloat(document.getElementById('s1').value);
+                        const f2 = parseFloat(document.getElementById('s2').value);
+                        
+                        tempDiv.innerHTML = `
+                            <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
+                                <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
+                            </div>
+                        `;
+                        document.body.appendChild(tempDiv);
+                        
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        const canvas = await html2canvas(tempDiv.firstElementChild, {
+                            scale: 4,
+                            backgroundColor: '#ffffff'
+                        });
+                        
+                        const a = document.createElement('a');
+                        const filename = (label.line1 || 'birka').replace(/[^a-zA-Z0-9]/g, '_');
+                        a.href = canvas.toDataURL('image/png');
+                        a.download = `emil_${filename}_${q+1}.png`;
+                        a.click();
+                        
+                        document.body.removeChild(tempDiv);
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
                 }
                 
-                toast(`🖼️ Создано ${selectedIndices.size} PNG файлов!`, 'success');
+                const totalQty = Array.from(selectedIndices.values()).reduce((sum, qty) => sum + qty, 0);
+                toast(`🖼️ Создано ${totalQty} PNG файлов!`, 'success');
                 
             } catch(e) {
                 console.error('Ошибка PNG:', e);
@@ -1734,45 +1796,49 @@ L=50м"></textarea>
                 const pt = parseFloat(document.getElementById('s4').value);
 
                 let isFirst = true;
-                const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                const sortedEntries = Array.from(selectedIndices.entries()).sort((a, b) => a[0] - b[0]);
 
-                for (const i of sortedIndices) {
-                    if (!isFirst) {
-                        pdf.addPage();
-                    }
-                    isFirst = false;
-
+                for (const [i, quantity] of sortedEntries) {
                     const label = filtered[i];
-                    const tempDiv = document.createElement('div');
-                    tempDiv.style.position = 'absolute';
-                    tempDiv.style.left = '-9999px';
                     
-                    tempDiv.innerHTML = `
-                        <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
-                            <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
-                            <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
-                        </div>
-                    `;
-                    document.body.appendChild(tempDiv);
+                    for (let q = 0; q < quantity; q++) {
+                        if (!isFirst) {
+                            pdf.addPage();
+                        }
+                        isFirst = false;
 
-                    await new Promise(resolve => setTimeout(resolve, 50));
+                        const tempDiv = document.createElement('div');
+                        tempDiv.style.position = 'absolute';
+                        tempDiv.style.left = '-9999px';
+                        
+                        tempDiv.innerHTML = `
+                            <div class="label" style="padding-top:${pt}mm;line-height:${lh};width:40mm;height:30mm;border:2px solid #000;display:flex;flex-direction:column;justify-content:center;text-align:center;padding-left:2mm;padding-right:2mm;background:white;font-size:10pt;">
+                                <div style="font-size:${f1}pt;font-weight:${w1}">${label.line1 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line2 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line3 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line4 || ''}</div>
+                                <div style="font-size:${f2}pt;font-weight:${w2}">${label.line5 || ''}</div>
+                            </div>
+                        `;
+                        document.body.appendChild(tempDiv);
 
-                    const canvas = await html2canvas(tempDiv.firstElementChild, {
-                        scale: 4,
-                        backgroundColor: '#ffffff'
-                    });
+                        await new Promise(resolve => setTimeout(resolve, 50));
 
-                    const imgData = canvas.toDataURL('image/png');
-                    pdf.addImage(imgData, 'PNG', 0, 0, 40, 30);
+                        const canvas = await html2canvas(tempDiv.firstElementChild, {
+                            scale: 4,
+                            backgroundColor: '#ffffff'
+                        });
 
-                    document.body.removeChild(tempDiv);
+                        const imgData = canvas.toDataURL('image/png');
+                        pdf.addImage(imgData, 'PNG', 0, 0, 40, 30);
+
+                        document.body.removeChild(tempDiv);
+                    }
                 }
 
-                pdf.save(`emil_birki_${selectedIndices.size}_${new Date().toISOString().slice(0,10)}.pdf`);
-                toast(`📄 PDF создан: ${selectedIndices.size} бирок!`, 'success');
+                const totalQty = Array.from(selectedIndices.values()).reduce((sum, qty) => sum + qty, 0);
+                pdf.save(`emil_birki_${totalQty}_${new Date().toISOString().slice(0,10)}.pdf`);
+                toast(`📄 PDF создан: ${totalQty} бирок!`, 'success');
             } catch(e) {
                 console.error('Ошибка PDF:', e);
                 toast('❌ Ошибка создания PDF', 'error');
@@ -1821,15 +1887,20 @@ L=50м"></textarea>
             const pt = parseFloat(document.getElementById('s4').value);
             
             const htmlParts = [];
-            selectedIndices.forEach(i => {
+            const sortedEntries = Array.from(selectedIndices.entries()).sort((a, b) => a[0] - b[0]);
+            
+            sortedEntries.forEach(([i, quantity]) => {
                 const label = filtered[i];
-                htmlParts.push(getLabelHTML(label, f1, f2, lh, pt));
+                for (let q = 0; q < quantity; q++) {
+                    htmlParts.push(getLabelHTML(label, f1, f2, lh, pt));
+                }
             });
 
             document.getElementById('printArea').innerHTML = htmlParts.join('');
             setTimeout(() => {
                 window.print();
-                toast(`🖨️ ${selectedIndices.size} бирок отправлены на печать!`, 'success');
+                const totalQty = Array.from(selectedIndices.values()).reduce((sum, qty) => sum + qty, 0);
+                toast(`🖨️ ${totalQty} бирок отправлены на печать!`, 'success');
             }, 300);
         }
 
@@ -1922,7 +1993,6 @@ L=50м"></textarea>
         document.getElementById('loadFileBtn').addEventListener('click', loadFromFile);
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
         document.getElementById('saveFileBtn').addEventListener('click', saveToFile);
-        document.getElementById('loadCloudBtn').addEventListener('click', loadFromCloud);
         document.getElementById('importBtn').addEventListener('click', importLabels);
         document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
 
