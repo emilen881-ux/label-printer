@@ -415,7 +415,7 @@
             box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         }
         
-        input[type="text"], textarea {
+        input[type="text"], textarea, select {
             width: 100%;
             padding: 14px;
             border: 2px solid rgba(102,126,234,0.2);
@@ -426,20 +426,24 @@
             background: rgba(255,255,255,0.9);
         }
         
-        input[type="text"]:focus, textarea:focus {
+        input[type="text"]:focus, textarea:focus, select:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 4px rgba(102,126,234,0.1);
             background: white;
             transform: translateY(-2px);
         }
-
+        
         input[type="file"] { display: none; }
         textarea { 
             min-height: 120px;
             font-family: 'Monaco', 'Courier New', monospace;
             font-size: 13px;
             resize: vertical;
+        }
+        
+        select {
+            cursor: pointer;
         }
         
         .preview {
@@ -720,7 +724,7 @@
         }
 
         .usb-info {
-            background: linear-gradient(135dx, rgba(254,215,226,0.8), rgba(252,165,165,0.8));
+            background: linear-gradient(135deg, rgba(254,215,226,0.8), rgba(252,165,165,0.8));
             backdrop-filter: blur(10px);
             border: 2px solid #EC4899;
             border-radius: 12px;
@@ -990,6 +994,13 @@
             <div class="usb-status disconnected" id="usbStatus">
                 🔴 Принтер не подключен
             </div>
+            
+            <div class="control-label" style="margin-bottom: 8px;"><span>Выбери протокол принтера:</span></div>
+            <select id="printerProtocol">
+                <option value="escpos">ESC/POS (стандартный)</option>
+                <option value="tspl">TSPL (Xprinter)</option>
+                <option value="zpl">ZPL (Zebra)</option>
+            </select>
             
             <button class="btn usb" id="usbConnectBtn">🔌 Подключить USB принтер</button>
             <button class="btn usb" id="usbPrintBtn" disabled>⚡ Печать через USB</button>
@@ -1387,7 +1398,7 @@ L=50м"></textarea>
             document.getElementById('v4').textContent = pt + 'мм';
         }
 
-        // ====== USB ПЕЧАТЬ (XPRINTER XP-365B) ======
+        // ====== USB ПЕЧАТЬ (3 ПРОТОКОЛА) ======
         
         async function connectUSB() {
             if (!navigator.usb) {
@@ -1398,12 +1409,12 @@ L=50м"></textarea>
             try {
                 usbDevice = await navigator.usb.requestDevice({
                     filters: [
-                        { vendorId: 0x0416 },
-                        { vendorId: 0x1FC9 },
-                        { vendorId: 0x0483 },
-                        { vendorId: 0x1203 },
-                        { vendorId: 0x0B1B },
-                        { classCode: 7 }
+                        { vendorId: 0x0416 },  // Xprinter
+                        { vendorId: 0x1FC9 },  // NXP
+                        { vendorId: 0x0483 },  // STMicro
+                        { vendorId: 0x1203 },  // Vendor
+                        { vendorId: 0x0B1B },  // Zebra
+                        { classCode: 7 }       // Printer class
                     ]
                 });
                 
@@ -1439,7 +1450,7 @@ L=50м"></textarea>
                 }
                 
                 document.getElementById('usbStatus').className = 'usb-status connected';
-                document.getElementById('usbStatus').textContent = '🟢 Принтер подключен: ' + (usbDevice.productName || 'Xprinter XP-365B');
+                document.getElementById('usbStatus').textContent = '🟢 Принтер подключен: ' + (usbDevice.productName || 'USB Принтер') + ' (Endpoint: ' + usbEndpoint + ')';
                 
                 if (idx >= 0) {
                     document.getElementById('usbPrintBtn').disabled = false;
@@ -1453,26 +1464,31 @@ L=50м"></textarea>
             }
         }
         
+        // ПРОТОКОЛ 1: ESC/POS (стандартный для чековых принтеров)
         function generateESCPOS(label) {
             const ESC = '\x1B';
             const GS = '\x1D';
             
             let cmd = '';
-            cmd += ESC + '@';
+            cmd += ESC + '@';  // Инициализация
             
+            // Ширина 40мм = ~320 точек
             const widthLow = 320 & 0xFF;
             const widthHigh = (320 >> 8) & 0xFF;
             cmd += GS + 'W' + String.fromCharCode(widthLow) + String.fromCharCode(widthHigh);
-            cmd += ESC + 'a' + String.fromCharCode(1);
             
+            cmd += ESC + 'a' + String.fromCharCode(1);  // Центрирование
+            
+            // Первая строка (жирная, крупная)
             if (label.line1) {
-                cmd += ESC + 'E' + String.fromCharCode(1);
-                cmd += GS + '!' + String.fromCharCode(0x11);
+                cmd += ESC + 'E' + String.fromCharCode(1);  // Bold ON
+                cmd += GS + '!' + String.fromCharCode(0x11);  // Размер 2x
                 cmd += label.line1 + '\n';
             }
             
-            cmd += ESC + 'E' + String.fromCharCode(0);
-            cmd += GS + '!' + String.fromCharCode(0x00);
+            // Остальные строки (нормальные)
+            cmd += ESC + 'E' + String.fromCharCode(0);  // Bold OFF
+            cmd += GS + '!' + String.fromCharCode(0x00);  // Обычный размер
             
             if (label.line2) cmd += label.line2 + '\n';
             if (label.line3) cmd += label.line3 + '\n';
@@ -1480,7 +1496,85 @@ L=50м"></textarea>
             if (label.line5) cmd += label.line5 + '\n';
             
             cmd += '\n\n\n';
-            cmd += GS + 'V' + String.fromCharCode(66) + String.fromCharCode(0);
+            cmd += GS + 'V' + String.fromCharCode(66) + String.fromCharCode(0);  // Обрезка
+            
+            return cmd;
+        }
+        
+        // ПРОТОКОЛ 2: TSPL (Xprinter, TSC)
+        function generateTSPL(label) {
+            let cmd = '';
+            
+            cmd += 'SIZE 40 mm, 30 mm\r\n';
+            cmd += 'GAP 2 mm, 0 mm\r\n';
+            cmd += 'DIRECTION 0\r\n';
+            cmd += 'REFERENCE 0,0\r\n';
+            cmd += 'CLS\r\n';
+            
+            let y = 20;
+            
+            // Первая строка
+            if (label.line1) {
+                cmd += `TEXT 20,${y},"3",0,1,1,"${label.line1}"\r\n`;
+                y += 40;
+            }
+            
+            // Остальные строки
+            if (label.line2) {
+                cmd += `TEXT 20,${y},"2",0,1,1,"${label.line2}"\r\n`;
+                y += 30;
+            }
+            if (label.line3) {
+                cmd += `TEXT 20,${y},"2",0,1,1,"${label.line3}"\r\n`;
+                y += 30;
+            }
+            if (label.line4) {
+                cmd += `TEXT 20,${y},"2",0,1,1,"${label.line4}"\r\n`;
+                y += 30;
+            }
+            if (label.line5) {
+                cmd += `TEXT 20,${y},"2",0,1,1,"${label.line5}"\r\n`;
+            }
+            
+            cmd += 'PRINT 1\r\n';
+            
+            return cmd;
+        }
+        
+        // ПРОТОКОЛ 3: ZPL (Zebra)
+        function generateZPL(label) {
+            let cmd = '';
+            
+            cmd += '^XA\r\n';
+            cmd += '^PW320\r\n';  // Ширина 320 точек
+            cmd += '^LL240\r\n';  // Длина 240 точек
+            
+            let y = 20;
+            
+            // Первая строка
+            if (label.line1) {
+                cmd += `^FO20,${y}^A0N,30,30^FD${label.line1}^FS\r\n`;
+                y += 40;
+            }
+            
+            // Остальные строки
+            if (label.line2) {
+                cmd += `^FO20,${y}^A0N,20,20^FD${label.line2}^FS\r\n`;
+                y += 30;
+            }
+            if (label.line3) {
+                cmd += `^FO20,${y}^A0N,20,20^FD${label.line3}^FS\r\n`;
+                y += 30;
+            }
+            if (label.line4) {
+                cmd += `^FO20,${y}^A0N,20,20^FD${label.line4}^FS\r\n`;
+                y += 30;
+            }
+            if (label.line5) {
+                cmd += `^FO20,${y}^A0N,20,20^FD${label.line5}^FS\r\n`;
+            }
+            
+            cmd += '^XZ\r\n';
             
             return cmd;
         }
@@ -1502,13 +1596,27 @@ L=50м"></textarea>
                     line5: document.getElementById('l5').value
                 };
                 
-                const escpos = generateESCPOS(label);
+                const protocol = document.getElementById('printerProtocol').value;
+                let printerCmd = '';
+                
+                if (protocol === 'escpos') {
+                    printerCmd = generateESCPOS(label);
+                } else if (protocol === 'tspl') {
+                    printerCmd = generateTSPL(label);
+                } else if (protocol === 'zpl') {
+                    printerCmd = generateZPL(label);
+                }
+                
                 const encoder = new TextEncoder();
-                const data = encoder.encode(escpos);
+                const data = encoder.encode(printerCmd);
+                
+                console.log('Отправка команды:', printerCmd);
+                console.log('Endpoint:', usbEndpoint);
+                console.log('Данные:', data);
                 
                 await usbDevice.transferOut(usbEndpoint, data);
                 
-                toast('⚡ Отправлено на принтер!', 'success');
+                toast(`⚡ Отправлено на принтер (${protocol.toUpperCase()})!`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка печати:', error);
@@ -1528,12 +1636,20 @@ L=50м"></textarea>
             }
             
             try {
+                const protocol = document.getElementById('printerProtocol').value;
                 let allCommands = '';
                 const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
                 
                 sortedIndices.forEach(i => {
                     const label = filtered[i];
-                    allCommands += generateESCPOS(label);
+                    
+                    if (protocol === 'escpos') {
+                        allCommands += generateESCPOS(label);
+                    } else if (protocol === 'tspl') {
+                        allCommands += generateTSPL(label);
+                    } else if (protocol === 'zpl') {
+                        allCommands += generateZPL(label);
+                    }
                 });
                 
                 const encoder = new TextEncoder();
@@ -1541,7 +1657,7 @@ L=50м"></textarea>
                 
                 await usbDevice.transferOut(usbEndpoint, data);
                 
-                toast(`⚡ Напечатано ${selectedIndices.size} бирок!`, 'success');
+                toast(`⚡ Напечатано ${selectedIndices.size} бирок (${protocol.toUpperCase()})!`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка печати:', error);
@@ -1549,7 +1665,7 @@ L=50м"></textarea>
             }
         }
 
-        // ====== PNG/PDF ЭКСПОРТ ======
+        // ====== PNG/PDF ЭКСПОРТ (ИСПРАВЛЕНО) ======
 
         async function exportPNG() {
             if (idx < 0) return;
@@ -1630,15 +1746,17 @@ L=50м"></textarea>
             }
         }
 
+        // ИСПРАВЛЕНО: PDF теперь в ПОРТРЕТНОЙ ориентации (30x40mm)
         async function exportPDF() {
             if (idx < 0) return;
             
             try {
                 const { jsPDF } = window.jspdf;
+                // ИСПРАВЛЕНО: portrait, 30x40 (высота x ширина)
                 const pdf = new jsPDF({
-                    orientation: 'landscape',
+                    orientation: 'portrait',
                     unit: 'mm',
-                    format: [40, 30]
+                    format: [30, 40]
                 });
 
                 const canvas = await html2canvas(document.getElementById('preview'), {
@@ -1647,7 +1765,8 @@ L=50м"></textarea>
                 });
 
                 const imgData = canvas.toDataURL('image/png');
-                pdf.addImage(imgData, 'PNG', 0, 0, 40, 30);
+                // ИСПРАВЛЕНО: 30x40 (ширина x высота)
+                pdf.addImage(imgData, 'PNG', 0, 0, 30, 40);
                 
                 const l = document.getElementById('l1').value;
                 pdf.save(`emil_birka_${l.replace(/[^a-zA-Z0-9]/g,'_')}.pdf`);
@@ -1658,6 +1777,7 @@ L=50м"></textarea>
             }
         }
 
+        // ИСПРАВЛЕНО: Пакетный PDF в портретной ориентации
         async function batchPDF() {
             if (selectedIndices.size === 0) {
                 toast('⚠️ Выбери бирки!', 'error');
@@ -1666,10 +1786,11 @@ L=50м"></textarea>
 
             try {
                 const { jsPDF } = window.jspdf;
+                // ИСПРАВЛЕНО: portrait, 30x40
                 const pdf = new jsPDF({
-                    orientation: 'landscape',
+                    orientation: 'portrait',
                     unit: 'mm',
-                    format: [40, 30]
+                    format: [30, 40]
                 });
 
                 const f1 = parseFloat(document.getElementById('s1').value);
@@ -1710,7 +1831,8 @@ L=50м"></textarea>
                     });
 
                     const imgData = canvas.toDataURL('image/png');
-                    pdf.addImage(imgData, 'PNG', 0, 0, 40, 30);
+                    // ИСПРАВЛЕНО: 30x40 (ширина x высота)
+                    pdf.addImage(imgData, 'PNG', 0, 0, 30, 40);
 
                     document.body.removeChild(tempDiv);
                 }
